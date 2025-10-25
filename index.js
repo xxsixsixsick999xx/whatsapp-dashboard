@@ -1,12 +1,14 @@
-// ===============================
-// 📦 WHATSAPP DASHBOARD FINAL VERSION
-// ===============================
+// =====================================================
+// ✅ WHATSAPP DASHBOARD FINAL VERSION FOR RENDER
+// =====================================================
 
 import express from "express";
 import qrcode from "qrcode";
+import { google } from "googleapis";
+import chromium from "@sparticuz/chromium";
+import puppeteer from "puppeteer-core";
 import pkg from "whatsapp-web.js";
 const { Client, LocalAuth } = pkg;
-import { google } from "googleapis";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -17,9 +19,9 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static("public"));
 app.use(express.json());
 
-// ===============================
+// =====================================================
 // 🔐 GOOGLE SHEETS CONFIG
-// ===============================
+// =====================================================
 const auth = new google.auth.GoogleAuth({
   credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
@@ -28,19 +30,25 @@ const auth = new google.auth.GoogleAuth({
 const sheets = google.sheets({ version: "v4", auth });
 const SHEET_ID = process.env.SHEET_ID;
 
-// ===============================
-// 🤖 WHATSAPP CLIENT CONFIG
-// ===============================
+// =====================================================
+// 🤖 WHATSAPP CONFIG
+// =====================================================
 let qrCodeData = "";
 let isReady = false;
 let totalChat = 0;
 let client;
 
-function initWhatsApp() {
+async function initWhatsApp() {
   console.log("🚀 Inisialisasi WhatsApp Client...");
+
   client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: { headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] },
+    authStrategy: new LocalAuth({ dataPath: "./.auth" }),
+    puppeteer: {
+      headless: true,
+      executablePath: await chromium.executablePath(),
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+    },
   });
 
   // Saat QR muncul
@@ -55,12 +63,11 @@ function initWhatsApp() {
     isReady = true;
     console.log("✅ WhatsApp tersambung.");
 
-    // Hitung total chat dan tulis ke Google Sheets
-    const chats = await client.getChats();
-    totalChat = chats.length;
-    console.log(`📊 Total chat terbaca: ${totalChat}`);
-
     try {
+      const chats = await client.getChats();
+      totalChat = chats.length;
+      console.log(`📊 Total chat terbaca: ${totalChat}`);
+
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID,
         range: "Sheet1!A:B",
@@ -75,9 +82,9 @@ function initWhatsApp() {
     }
   });
 
-  // Saat logout atau error
+  // Saat disconnect
   client.on("disconnected", () => {
-    console.log("🔴 WhatsApp terputus, membuat QR baru...");
+    console.log("🔴 WhatsApp terputus, buat QR baru...");
     qrCodeData = "";
     isReady = false;
     initWhatsApp();
@@ -88,16 +95,16 @@ function initWhatsApp() {
 
 initWhatsApp();
 
-// ===============================
+// =====================================================
 // 🌐 ROUTES
-// ===============================
+// =====================================================
 
-// Halaman utama (QR)
+// Halaman utama
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// API: ambil QR
+// API: Ambil QR
 app.get("/qr", async (req, res) => {
   if (!qrCodeData) {
     return res.status(200).json({ status: "loading", message: "QR belum siap, silakan refresh halaman." });
@@ -105,17 +112,17 @@ app.get("/qr", async (req, res) => {
   res.json({ qr: qrCodeData });
 });
 
-// API: cek status koneksi
+// API: Cek koneksi
 app.get("/status", (req, res) => {
   res.json({ connected: isReady });
 });
 
-// API: total chat
+// API: Total chat
 app.get("/total", (req, res) => {
   res.json({ totalChat });
 });
 
-// API: disconnect
+// API: Disconnect manual
 app.post("/disconnect", async (req, res) => {
   try {
     if (client) {
@@ -134,7 +141,7 @@ app.post("/disconnect", async (req, res) => {
   }
 });
 
-// ===============================
-// 🚀 Jalankan Server
-// ===============================
+// =====================================================
+// 🚀 JALANKAN SERVER
+// =====================================================
 app.listen(PORT, () => console.log(`✅ Server aktif di port ${PORT}`));
