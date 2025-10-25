@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard WhatsApp | PDGLABS</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h2>📊 WhatsApp Dashboard</h2>
+
+  <div class="buttons">
+    <button id="btn-conn" style="background:green;">🟢 Check Connection</button>
+    <button id="btn-read" style="background:gold;">🟡 Check Chat Reader</button>
+    <button id="btn-dis" style="background:red;">🔴 Disconnect</button>
+  </div>
+
+  <div id="status"></div>
+  <div id="result"></div>
+
+  <script>
+    document.getElementById("btn-conn").onclick = async () => {
+      const s = await fetch("/status").then(r => r.json());
+      document.getElementById("status").innerText = s.connected ? "🟢 Connected" : "🔴 Disconnected";
+    };
+
+    document.getElementById("btn-read").onclick = async () => {
+      const t = await fetch("/total").then(r => r.json());
+      document.getElementById("result").innerText = `Total chat: ${t.totalChat}`;
+      document.getElementById("btn-read").style.background = "green";
+    };
+
+    document.getElementById("btn-dis").onclick = async () => {
+      await fetch("/disconnect", { method: "POST" });
+      alert("WhatsApp telah di-disconnect. QR baru siap di halaman utama.");
+      window.location.href = "/";
+    };
+  </script>
+</body>
+</html>

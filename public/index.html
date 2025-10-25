@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>QR WhatsApp | PDGLABS</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h2>📱 Scan QR WhatsApp</h2>
+  <div id="qr-area">Memuat QR...</div>
+
+  <script>
+    async function loadQR() {
+      const res = await fetch("/qr");
+      const data = await res.json();
+      document.getElementById("qr-area").innerHTML = `<img src="${data.qr}" width="250">`;
+    }
+    loadQR();
+
+    // Cek koneksi tiap 3 detik
+    setInterval(async () => {
+      const s = await fetch("/status").then(r => r.json());
+      if (s.connected) window.location.href = "/dashboard.html";
+    }, 3000);
+  </script>
+</body>
+</html>
