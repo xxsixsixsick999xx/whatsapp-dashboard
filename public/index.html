@@ -20,11 +20,17 @@
       }
     }
 
+    async function checkStatus() {
+      const s = await fetch("/status").then(r => r.json());
+      if (s.connected) {
+        console.log("🟢 WhatsApp connected, membuka dashboard...");
+        window.location.href = "/dashboard.html";
+      }
+    }
+
     loadQR();
-    setInterval(async () => {
-      const status = await fetch("/status").then(r => r.json());
-      if (status.connected) window.location.href = "/dashboard.html";
-    }, 4000);
+    setInterval(loadQR, 10000);
+    setInterval(checkStatus, 3000);
   </script>
 </body>
 </html>
