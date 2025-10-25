@@ -1,5 +1,5 @@
 // =====================================================
-// ✅ WHATSAPP DASHBOARD FINAL VERSION FOR RENDER
+// ✅ WHATSAPP DASHBOARD FINAL MULTI-SHEET VERSION
 // =====================================================
 
 import express from "express";
@@ -26,12 +26,11 @@ const auth = new google.auth.GoogleAuth({
   credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
-
 const sheets = google.sheets({ version: "v4", auth });
 const SHEET_ID = process.env.SHEET_ID;
 
 // =====================================================
-// 🤖 WHATSAPP CONFIG
+// 🤖 WHATSAPP CLIENT CONFIG
 // =====================================================
 let qrCodeData = "";
 let isReady = false;
@@ -51,40 +50,44 @@ async function initWhatsApp() {
     },
   });
 
-  // Saat QR muncul
   client.on("qr", async (qr) => {
     qrCodeData = await qrcode.toDataURL(qr);
     isReady = false;
     console.log("🔄 QR baru siap discan.");
   });
 
-  // Saat berhasil login
   client.on("ready", async () => {
     isReady = true;
-    console.log("✅ WhatsApp tersambung.");
+    console.log("✅ WhatsApp tersambung. Mengambil daftar chat...");
 
     try {
+      // Tunggu agar WhatsApp sempat load semua chat
+      await new Promise((r) => setTimeout(r, 3000));
+
       const chats = await client.getChats();
       totalChat = chats.length;
       console.log(`📊 Total chat terbaca: ${totalChat}`);
 
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SHEET_ID,
-        range: "Sheet1!A:B",
-        valueInputOption: "USER_ENTERED",
-        requestBody: {
-          values: [[new Date().toLocaleString("id-ID"), totalChat]],
-        },
-      });
-      console.log("✅ Data berhasil disimpan ke Google Sheets.");
+      // Simpan ke dua sheet: Sheet1 dan Sheet67
+      const values = [[new Date().toLocaleString("id-ID"), totalChat]];
+      const targets = ["Sheet1!A:B", "Sheet67!A:B"];
+
+      for (const range of targets) {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SHEET_ID,
+          range,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values },
+        });
+        console.log(`✅ Data berhasil disimpan ke ${range}`);
+      }
     } catch (err) {
-      console.error("❌ Gagal menyimpan ke Google Sheets:", err.message);
+      console.error("❌ Gagal membaca chat atau menulis ke Sheets:", err.message);
     }
   });
 
-  // Saat disconnect
   client.on("disconnected", () => {
-    console.log("🔴 WhatsApp terputus, buat QR baru...");
+    console.log("🔴 WhatsApp terputus. Membuat QR baru...");
     qrCodeData = "";
     isReady = false;
     initWhatsApp();
@@ -99,30 +102,23 @@ initWhatsApp();
 // 🌐 ROUTES
 // =====================================================
 
-// Halaman utama
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+// Halaman utama (QR)
+app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
-// API: Ambil QR
+// API: ambil QR
 app.get("/qr", async (req, res) => {
-  if (!qrCodeData) {
-    return res.status(200).json({ status: "loading", message: "QR belum siap, silakan refresh halaman." });
-  }
+  if (!qrCodeData)
+    return res.status(200).json({ status: "loading", message: "QR belum siap, silakan refresh." });
   res.json({ qr: qrCodeData });
 });
 
-// API: Cek koneksi
-app.get("/status", (req, res) => {
-  res.json({ connected: isReady });
-});
+// API: cek status koneksi
+app.get("/status", (req, res) => res.json({ connected: isReady }));
 
-// API: Total chat
-app.get("/total", (req, res) => {
-  res.json({ totalChat });
-});
+// API: total chat
+app.get("/total", (req, res) => res.json({ totalChat }));
 
-// API: Disconnect manual
+// API: disconnect manual
 app.post("/disconnect", async (req, res) => {
   try {
     if (client) {
@@ -131,7 +127,7 @@ app.post("/disconnect", async (req, res) => {
       qrCodeData = "";
       isReady = false;
       initWhatsApp();
-      res.json({ message: "🔴 WhatsApp telah diputus, QR baru siap di halaman utama." });
+      res.json({ message: "🔴 WhatsApp telah diputus. QR baru siap di halaman utama." });
     } else {
       res.status(400).json({ message: "❌ Client belum aktif." });
     }
@@ -142,6 +138,6 @@ app.post("/disconnect", async (req, res) => {
 });
 
 // =====================================================
-// 🚀 JALANKAN SERVER
+// 🚀 Jalankan Server
 // =====================================================
 app.listen(PORT, () => console.log(`✅ Server aktif di port ${PORT}`));

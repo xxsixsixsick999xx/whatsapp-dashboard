@@ -1,10 +1,22 @@
 body {
   text-align: center;
   font-family: 'Poppins', sans-serif;
-  background-color: #f3f6fa;
+  background-color: #f7f7f7;
   margin: 50px;
 }
-h2 { color: #333; }
+
+h2 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+#qr-area img {
+  border: 4px solid #333;
+  border-radius: 10px;
+  padding: 10px;
+  background: white;
+}
+
 button {
   padding: 10px 20px;
   margin: 10px;
@@ -14,12 +26,8 @@ button {
   cursor: pointer;
   font-size: 16px;
 }
+
 #result, #status {
   margin-top: 20px;
   font-size: 18px;
-}
-img {
-  border: 4px solid #ddd;
-  border-radius: 10px;
-  margin-top: 20px;
 }

@@ -1,5 +1,5 @@
 node_modules/
-.session/
 .auth/
-.DS_Store
+.session/
 credentials.json
+.DS_Store

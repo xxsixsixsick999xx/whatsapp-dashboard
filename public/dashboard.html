@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard WhatsApp</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h2>📊 WhatsApp Dashboard</h2>
+
+  <div id="status">Mengecek koneksi...</div>
+  <div class="buttons">
+    <button id="btn-conn" style="background:green;">Check Connection</button>
+    <button id="btn-read" style="background:gold;">Check Chat Reader</button>
+    <button id="btn-dis" style="background:red;">Disconnect</button>
+  </div>
+
+  <div id="result"></div>
+
+  <script>
+    async function updateStatus() {
+      const s = await fetch("/status").then(r => r.json());
+      document.getElementById("status").innerText = s.connected
+        ? "🟢 WhatsApp Connected"
+        : "🔴 Disconnected";
+    }
+
+    async function updateTotal() {
+      const t = await fetch("/total").then(r => r.json());
+      document.getElementById("result").innerText =
+        `Total chat saat ini: ${t.totalChat || 0}`;
+      if (t.totalChat > 0) {
+        document.getElementById("btn-read").style.background = "green";
+      }
+    }
+
+    document.getElementById("btn-conn").onclick = updateStatus;
+    document.getElementById("btn-read").onclick = updateTotal;
+    document.getElementById("btn-dis").onclick = async () => {
+      await fetch("/disconnect", { method: "POST" });
+      alert("WhatsApp telah di-disconnect, QR baru siap.");
+      window.location.href = "/";
+    };
+
+    // Jalankan otomatis setiap 5 detik
+    setInterval(updateStatus, 5000);
+    setInterval(updateTotal, 5000);
+
+    // Jalankan pertama kali
+    updateStatus();
+    updateTotal();
+  </script>
+</body>
+</html>

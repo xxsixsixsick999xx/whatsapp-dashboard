@@ -2,26 +2,29 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>QR WhatsApp | PDGLABS</title>
+  <title>QR Login WhatsApp</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <h2>📱 Scan QR WhatsApp</h2>
-  <div id="qr-area">Memuat QR...</div>
+  <h2>📱 Scan QR untuk Login WhatsApp</h2>
+  <div id="qr-area">Loading QR...</div>
 
   <script>
     async function loadQR() {
       const res = await fetch("/qr");
       const data = await res.json();
-      document.getElementById("qr-area").innerHTML = `<img src="${data.qr}" width="250">`;
+      if (data.qr) {
+        document.getElementById("qr-area").innerHTML = `<img src="${data.qr}" width="250">`;
+      } else {
+        document.getElementById("qr-area").innerText = data.message || "Menunggu QR...";
+      }
     }
-    loadQR();
 
-    // Cek koneksi tiap 3 detik
+    loadQR();
     setInterval(async () => {
-      const s = await fetch("/status").then(r => r.json());
-      if (s.connected) window.location.href = "/dashboard.html";
-    }, 3000);
+      const status = await fetch("/status").then(r => r.json());
+      if (status.connected) window.location.href = "/dashboard.html";
+    }, 4000);
   </script>
 </body>
 </html>
