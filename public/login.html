@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>Login WhatsApp Counter</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h2>Masukkan Nama Anda</h2>
+    <input type="text" id="name" placeholder="Nama lengkap" />
+    <button onclick="submitName()">Lanjut</button>
+  </div>
+  <script>
+    function submitName() {
+      const name = document.getElementById("name").value.trim();
+      if (!name) return alert("Masukkan nama!");
+      window.location.href = `/login?name=${encodeURIComponent(name)}`;
+    }
+  </script>
+</body>
+</html>

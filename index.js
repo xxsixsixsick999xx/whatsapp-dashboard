@@ -1,144 +1,109 @@
-// =====================================================
-// ✅ WHATSAPP DASHBOARD FINAL (Redirect + Multi-Sheet)
-// =====================================================
-
 import express from "express";
-import qrcode from "qrcode";
-import { google } from "googleapis";
-import chromium from "@sparticuz/chromium";
 import pkg from "whatsapp-web.js";
-const { Client, LocalAuth } = pkg;
-import path from "path";
-import { fileURLToPath } from "url";
+import qrcode from "qrcode-terminal";
+import { google } from "googleapis";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const { Client, LocalAuth } = pkg;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static("public"));
-app.use(express.json());
+// =============== GOOGLE SHEETS CONFIG =====================
+const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+const SHEET_ID = process.env.SHEET_ID;
 
-// =====================================================
-// 🔐 GOOGLE SHEETS CONFIG
-// =====================================================
 const auth = new google.auth.GoogleAuth({
-  credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
+  credentials,
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 const sheets = google.sheets({ version: "v4", auth });
-const SHEET_ID = process.env.SHEET_ID;
 
-// =====================================================
-// 🤖 WHATSAPP CLIENT CONFIG
-// =====================================================
-let qrCodeData = "";
-let isReady = false;
-let totalChat = 0;
-let client;
+// =============== WHATSAPP CLIENT ==========================
+let currentUser = "";
 
-async function initWhatsApp() {
-  console.log("🚀 Inisialisasi WhatsApp Client...");
-
-  client = new Client({
-    authStrategy: new LocalAuth({ dataPath: "./.auth" }),
-    puppeteer: {
-      headless: true,
-      executablePath: await chromium.executablePath(),
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-    },
-  });
-
-  // === EVENT: QR ===
-  client.on("qr", async (qr) => {
-    qrCodeData = await qrcode.toDataURL(qr);
-    isReady = false;
-    console.log("🔄 QR baru siap discan.");
-  });
-
-  // === EVENT: READY ===
-  client.on("ready", async () => {
-    console.log("✅ WhatsApp tersambung!");
-    isReady = true;
-
-    try {
-      // Tunggu agar semua chat benar-benar dimuat
-      await new Promise((r) => setTimeout(r, 7000));
-
-      console.log("⏳ Membaca daftar chat...");
-      const chats = await client.getChats();
-      totalChat = chats.length;
-      console.log(`📊 Total chat terbaca: ${totalChat}`);
-
-      // Simpan ke Sheet1 dan Sheet67
-      const values = [[new Date().toLocaleString("id-ID"), totalChat]];
-      const targets = ["Sheet1!A:B", "Sheet67!A:B"];
-
-      for (const range of targets) {
-        await sheets.spreadsheets.values.append({
-          spreadsheetId: SHEET_ID,
-          range,
-          valueInputOption: "USER_ENTERED",
-          requestBody: { values },
-        });
-        console.log(`✅ Data tersimpan ke ${range}`);
-      }
-    } catch (err) {
-      console.error("❌ Gagal membaca chat:", err.message);
-    }
-  });
-
-  // === EVENT: DISCONNECTED ===
-  client.on("disconnected", () => {
-    console.log("🔴 WhatsApp terputus. Membuat QR baru...");
-    qrCodeData = "";
-    isReady = false;
-    initWhatsApp();
-  });
-
-  client.initialize();
-}
-
-initWhatsApp();
-
-// =====================================================
-// 🌐 ROUTES
-// =====================================================
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
-
-app.get("/qr", async (req, res) => {
-  if (!qrCodeData)
-    return res.status(200).json({ status: "loading", message: "QR belum siap, silakan refresh." });
-  res.json({ qr: qrCodeData });
+const client = new Client({
+  authStrategy: new LocalAuth(),
+  puppeteer: { headless: true, args: ["--no-sandbox"] },
 });
 
-app.get("/status", (req, res) => {
-  res.json({
-    connected: isReady && client && client.info ? true : false,
-  });
+let qrCodeCurrent = "";
+
+client.on("qr", qr => {
+  qrCodeCurrent = qr;
+  console.log("QR siap discan di website!");
 });
 
-app.get("/total", (req, res) => res.json({ totalChat }));
+client.on("ready", async () => {
+  console.log("✅ WhatsApp Connected, membaca daftar chat...");
 
-app.post("/disconnect", async (req, res) => {
   try {
-    if (client) {
-      await client.logout();
-      client.destroy();
-      qrCodeData = "";
-      isReady = false;
-      initWhatsApp();
-      res.json({ message: "🔴 WhatsApp telah diputus. QR baru siap di halaman utama." });
+    const chats = await client.getChats();
+    const contacts = [
+      ...new Set(
+        chats
+          .filter(c => c.id.user && !c.isGroup)
+          .map(c => c.id.user)
+      ),
+    ];
+    if (contacts.length === 0) {
+      console.log("⚠️ Tidak ada chat ditemukan, tidak diinput ke Sheet.");
+      return;
+    }
+
+    const contactsList = contacts.join(", ");
+    const time = new Date().toLocaleString("id-ID", {
+      timeZone: "Asia/Jakarta",
+    });
+
+    // baca isi sheet dulu
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: "Sheet1!A:B",
+    });
+    const rows = res.data.values || [];
+    const existingRowIndex = rows.findIndex(r => r[0] === currentUser);
+
+    if (existingRowIndex !== -1) {
+      // update baris
+      const rowNumber = existingRowIndex + 1;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: `Sheet1!A${rowNumber}:B${rowNumber}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [[currentUser, contactsList]] },
+      });
+      console.log(`🔁 Update data ${currentUser} (${contacts.length} kontak)`);
     } else {
-      res.status(400).json({ message: "❌ Client belum aktif." });
+      // tambah baris baru
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID,
+        range: "Sheet1!A:B",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [[currentUser, contactsList]] },
+      });
+      console.log(`✅ Tambah data ${currentUser} (${contacts.length} kontak)`);
     }
   } catch (err) {
-    console.error("❌ Gagal disconnect:", err.message);
-    res.status(500).json({ message: "Terjadi kesalahan saat disconnect." });
+    console.error("❌ Gagal menyimpan ke Google Sheet:", err);
   }
 });
 
-// =====================================================
-// 🚀 Jalankan Server
-// =====================================================
-app.listen(PORT, () => console.log(`✅ Server aktif di port ${PORT}`));
+// ===========================================================
+app.use(express.static("public"));
+app.use(express.json());
+
+app.get("/qr", (req, res) => {
+  if (!qrCodeCurrent) return res.json({ status: "waiting" });
+  res.json({ qr: qrCodeCurrent });
+});
+
+app.post("/login", (req, res) => {
+  const { name } = req.query;
+  if (!name) return res.status(400).send("Nama diperlukan");
+  currentUser = name;
+  res.redirect("/scan.html");
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server berjalan di port ${PORT}`);
+  client.initialize();
+});

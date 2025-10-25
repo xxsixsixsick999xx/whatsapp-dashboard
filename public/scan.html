@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>Scan QR WhatsApp</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h2>Scan QR Code WhatsApp</h2>
+    <img id="qr" src="" alt="QR Code" />
+    <p id="status">Menunggu QR...</p>
+  </div>
+  <script>
+    async function getQR() {
+      const res = await fetch("/qr");
+      const data = await res.json();
+      if (data.qr) {
+        document.getElementById("qr").src =
+          "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + data.qr;
+        document.getElementById("status").innerText = "Silakan scan QR dengan WhatsApp Anda.";
+      } else {
+        document.getElementById("status").innerText = "Menunggu QR dari server...";
+        setTimeout(getQR, 2000);
+      }
+    }
+    getQR();
+  </script>
+</body>
+</html>
